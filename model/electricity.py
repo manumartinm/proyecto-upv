@@ -50,6 +50,9 @@ class EnergyOptimizer:
 
                 self.df = pd.merge(self.df, price_df_renamed[['timestamp', 'precio_electricidad_eur_kwh']],
                                    on='timestamp', how='left', suffixes=('', '_new_price'))
+                
+                print(self.df.head())
+                print(self.df.columns)
 
                 if 'precio_electricidad_eur_kwh_new_price' in self.df.columns:
                      st.info("Sobrescribiendo columna de precio existente con los datos proporcionados.")
@@ -326,7 +329,7 @@ class EnergyOptimizer:
 
         # Predecimos el consumo
         if self.model_consumo and all(f in self.df_future.columns for f in self.features_consumo):
-            X_future_c = self.df_future[self.features_consumo].dropna()
+            X_future_c = self.df_future[self.features_consumo]
             if not X_future_c.empty:
                 self.df_future['consumo_pred'] = self.model_consumo.predict(X_future_c)
                 self.df_future['consumo_pred'] = self.df_future['consumo_pred'].apply(lambda x: max(0, x))
@@ -341,7 +344,7 @@ class EnergyOptimizer:
 
         # Predecimos la generación solar
         if self.model_generacion and all(f in self.df_future.columns for f in self.features_generacion):
-            X_future_g = self.df_future[self.features_generacion].dropna()
+            X_future_g = self.df_future[self.features_generacion]
             if not X_future_g.empty:
                 self.df_future['generacion_solar_pred'] = self.model_generacion.predict(X_future_g)
                 self.df_future['generacion_solar_pred'] = self.df_future['generacion_solar_pred'].apply(lambda x: max(0, x))
@@ -355,7 +358,7 @@ class EnergyOptimizer:
 
         # Predecimos el precio de venta
         if self.model_precio and all(f in self.df_future.columns for f in self.features_precio):
-            X_future_p = self.df_future[self.features_precio].dropna()
+            X_future_p = self.df_future[self.features_precio]
             if not X_future_p.empty:
                 self.df_future['precio_venta_pred'] = self.model_precio.predict(X_future_p)
                 self.df_future['precio_venta_pred'] = self.df_future['precio_venta_pred'].apply(lambda x: max(0, x))
@@ -420,11 +423,11 @@ class EnergyOptimizer:
 
             if t == 0:
                 problem += (
-                    s[t] == 0 + b_charge[t] * eficiencia_bateria - b_discharge[t] / eficiencia_bateria
+                    s[t] == 0 + b_charge[t] * eficiencia_bateria - b_discharge[t] * (1 / eficiencia_bateria)
                 ), f"Bateria_Estado_{t}"
             else:
                 problem += (
-                    s[t] == s[t-1] + b_charge[t] * eficiencia_bateria - b_discharge[t] / eficiencia_bateria
+                    s[t] == s[t-1] + b_charge[t] * eficiencia_bateria - b_discharge[t] * (1 / eficiencia_bateria)
                 ), f"Bateria_Estado_{t}"
 
             problem += (s[t] <= bateria_max_kwh), f"Bateria_Capacidad_{t}"

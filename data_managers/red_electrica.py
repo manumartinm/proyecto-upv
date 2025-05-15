@@ -28,15 +28,14 @@ class RedElectricaDataManager:
             st.error(f"Error en fechas {fecha_inicio} a {fecha_fin}: {e}")
             return pd.DataFrame()
     
-    @st.cache_data(ttl=3600*24)  # Caché por 24 horas
-    def cargar_datos_completos(self, año=2024):
-        fecha_base = datetime(año, 1, 1)
-        fecha_final = datetime(año, 12, 31)
-        delta = timedelta(days=7)
+    def cargar_datos_completos(self, fecha_inicio, fecha_fin, delta_dias=7):
+        fecha_base = datetime.strptime(fecha_inicio, '%Y-%m-%d')
+        fecha_final = datetime.strptime(fecha_fin, '%Y-%m-%d')
+        delta = timedelta(days=delta_dias)
         
         dfs = []
         
-        with st.spinner(f'Cargando datos de precios de electricidad para {año}...'):
+        with st.spinner(f'Cargando datos de precios de electricidad para el año {fecha_inicio}...'):
             while fecha_base < fecha_final:
                 inicio = fecha_base.strftime('%Y-%m-%d')
                 fin = (fecha_base + delta - timedelta(days=1)).strftime('%Y-%m-%d')
@@ -46,18 +45,14 @@ class RedElectricaDataManager:
                 fecha_base += delta
         
         if not dfs:
-            st.error(f"No se pudieron obtener datos para el año {año}")
+            st.error(f"No se pudieron obtener datos para el año {fecha_inicio}.")
             return pd.DataFrame()
             
         # Unimos todos los resultados
         df_completo = pd.concat(dfs, ignore_index=True)
-        
+        print(df_completo.head())
         # Procesamiento del dataframe
-        df_completo['datetime'] = pd.to_datetime(df_completo['datetime'])
-        df_completo['fecha'] = df_completo['datetime'].dt.date
-        df_completo['hora'] = df_completo['datetime'].dt.hour
-        df_completo['dia_semana'] = df_completo['datetime'].dt.dayofweek
-        df_completo['mes'] = df_completo['datetime'].dt.month
+        df_completo['datetime'] = pd.to_datetime(df_completo['datetime'], errors='coerce', utc=True)
         
         # Convertir valor a céntimos de euro y redondear
         df_completo['valor_centimos'] = df_completo['value'] * 100

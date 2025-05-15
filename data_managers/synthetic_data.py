@@ -15,11 +15,7 @@ class SyntheticDataGenerator:
             raise ValueError("Tipo de hogar no reconocido. Debe ser 'familia', 'pareja_joven' o 'jubilado'.")
 
         if meteo_df is None or meteo_df.empty:
-             # Note: In a real application, you might want to fetch data here
-             # using WeatherDataManager if meteo_df is None.
-             # For this refactoring, we assume meteo_df is provided.
-            print("Warning: No meteorological data provided (meteo_df is None or empty). Consumption will be based on base profiles only.")
-
+            print("Warning: No meteorological data provided (meteo_df is None or empty).")
 
         self.tipo_hogar = tipo_hogar
         self.inicio = inicio
@@ -28,67 +24,49 @@ class SyntheticDataGenerator:
         self.meteo_df = meteo_df
         self.num_paneles = num_paneles
         self.potencia_panel_w = potencia_panel_w
+        self.potencia_total_kw = (num_paneles * potencia_panel_w) / 1000
 
-        # Initialize auxiliary dictionaries and parameters
         self._multiplicador_mes = {
-            1: 1.10, 2: 1.05, 3: 1.00, 4: 0.97,
-            5: 0.95, 6: 0.98, 7: 1.02, 8: 1.03,
-            9: 0.98, 10: 1.00, 11: 1.05, 12: 1.08
+            1: 1.10, 2: 1.05, 3: 1.00, 4: 0.97, 5: 0.95, 6: 0.98,
+            7: 1.02, 8: 1.03, 9: 0.98, 10: 1.00, 11: 1.05, 12: 1.08
         }
 
         self._hora_amanecer_mes = {
-            1: 8.25, 2: 7.45, 3: 7.3, 4: 7.0,
-            5: 6.3, 6: 6.15, 7: 6.3, 8: 7.0,
-            9: 7.3, 10: 8.0, 11: 7.3, 12: 8.0
+            1: 8.25, 2: 7.45, 3: 7.3, 4: 7.0, 5: 6.3, 6: 6.15,
+            7: 6.3, 8: 7.0, 9: 7.3, 10: 8.0, 11: 7.3, 12: 8.0
         }
 
         self._hora_atardecer_mes = {
-            1: 18.0, 2: 18.5, 3: 19.5, 4: 20.0,
-            5: 21.0, 6: 21.5, 7: 21.5, 8: 21.0,
-            9: 20.0, 10: 19.0, 11: 18.0, 12: 17.5
+            1: 18.0, 2: 18.5, 3: 19.5, 4: 20.0, 5: 21.0, 6: 21.5,
+            7: 21.5, 8: 21.0, 9: 20.0, 10: 19.0, 11: 18.0, 12: 17.5
         }
 
         self._eficiencia = np.random.choice(['alta', 'media', 'baja'], p=[0.3, 0.5, 0.2])
         self._multiplicador_eficiencia = {'alta': 0.9, 'media': 1.0, 'baja': 1.1}
-
-        # Umbrales de sensibilidad térmica variables
         self._limite_frio = np.random.uniform(9, 12)
         self._limite_calor = np.random.uniform(26, 29)
-
-        # Household specific parameters
-        self._num_personas = 0
-        self._vacaciones = False
-        self._jubilado_con_mas_luz = False
         self._setup_household_params()
-
-        # Vacation dates
-        self._dias_vacaciones = 0
-        self._fechas_vacaciones = []
         self._setup_vacations()
 
-
     def _setup_household_params(self):
-        """Sets up parameters specific to the household type."""
         if self.tipo_hogar == 'familia':
             self._num_personas = np.random.choice([2, 3, 4, 5, 6], p=[0.1, 0.35, 0.35, 0.15, 0.05])
-            self._vacaciones = np.random.rand() < (2 / 7) # Probability of having vacations
+            self._vacaciones = np.random.rand() < (2 / 7)
         elif self.tipo_hogar == 'pareja_joven':
             self._num_personas = np.random.choice([1, 2, 3, 4], p=[0.1, 0.6, 0.2, 0.1])
-            self._vacaciones = np.random.rand() < (4 / 10) # Probability of having vacations
+            self._vacaciones = np.random.rand() < (4 / 10)
         elif self.tipo_hogar == 'jubilado':
             self._num_personas = np.random.choice([1, 2, 3], p=[0.6, 0.35, 0.05])
             self._jubilado_con_mas_luz = np.random.rand() < 0.6
-            self._vacaciones = False # Jubilados might not have distinct 'vacation' periods in the same way
-
+            self._vacaciones = False
 
     def _setup_vacations(self):
-        """Determines vacation dates if applicable."""
+        self._fechas_vacaciones = []
         if self._vacaciones:
-            self._dias_vacaciones = np.random.randint(4, 16)
+            dias_vacaciones = np.random.randint(4, 16)
             fecha_inicio_dt = pd.to_datetime(self.inicio).tz_localize("UTC")
-            inicio_vacaciones = fecha_inicio_dt + timedelta(days=np.random.randint(0, self.dias - self._dias_vacaciones))
-            self._fechas_vacaciones = [inicio_vacaciones + timedelta(days=i) for i in range(self._dias_vacaciones)]
-
+            inicio_vacaciones = fecha_inicio_dt + timedelta(days=np.random.randint(0, self.dias - dias_vacaciones))
+            self._fechas_vacaciones = [inicio_vacaciones + timedelta(days=i) for i in range(dias_vacaciones)]
 
     def _get_base_consumption(self, hora, dia_semana):
         consumo_base = 0.0
@@ -129,17 +107,6 @@ class SyntheticDataGenerator:
 
 
     def _adjust_consumption_with_weather(self, consumo_base, ts, meteo):
-        """
-        Adjusts the base consumption based on meteorological conditions.
-
-        Args:
-            consumo_base (float): The base consumption value.
-            ts (datetime): Current timestamp.
-            meteo (pd.Series): Meteorological data for the current timestamp.
-
-        Returns:
-            float: Adjusted consumption value.
-        """
         consumo_ajustado = consumo_base
         hora = ts.hour + ts.minute / 60
         mes = ts.month
@@ -160,27 +127,32 @@ class SyntheticDataGenerator:
             consumo_ajustado *= 1.02
 
         return consumo_ajustado
+    
+    def _calculate_generation(self, ts, hora, mes, meteo):
+        if self._hora_amanecer_mes[mes] <= hora <= self._hora_atardecer_mes[mes]:
+            rango = self._hora_atardecer_mes[mes] - self._hora_amanecer_mes[mes]
+            x = (hora - self._hora_amanecer_mes[mes]) / rango
+            perfil_solar = max(np.sin(np.pi * x), 0)
+            sun_max = self.meteo_df['sunshine_duration'].max()
+
+            if meteo['cloud_cover'] > 90 and meteo['sunshine_duration'] == 0:
+                factor_clima = 0.05
+            elif meteo['cloud_cover'] < 20 and meteo['sunshine_duration'] > 0:
+                factor_clima = 1.0
+            else:
+                sunshine_frac = meteo['sunshine_duration'] / sun_max if sun_max > 0 else 0
+                cloud_factor = 1 - meteo['cloud_cover'] / 100
+                factor_clima = max(sunshine_frac * cloud_factor, 0.1)
+
+            return round(self._multiplicador_eficiencia[self._eficiencia] * self.potencia_total_kw * perfil_solar * factor_clima, 3)
+        return 0.0
 
 
     def generate_consumption(self):
-        """
-        Generates the energy consumption profile for the specified period.
-
-        Returns:
-            pd.DataFrame: DataFrame with 'timestamp' and 'consumo' columns.
-                          Returns None if no meteorological data is available.
-        """
         if self.meteo_df is None or self.meteo_df.empty:
-            print("Error: Cannot generate consumption without meteorological data.")
             return None
 
-        # Ensure meteo_df timestamp is UTC localized for comparison
-        if self.meteo_df['date'].dtype.tz is None:
-             self.meteo_df['timestamp'] = self.meteo_df['date'].dt.tz_localize('UTC')
-        else:
-             # Ensure all timestamps are consistently UTC
-             self.meteo_df['timestamp'] = self.meteo_df['date'].dt.tz_convert('UTC')
-
+        self.meteo_df['timestamp'] = self.meteo_df['date'].dt.tz_convert('UTC') if self.meteo_df['date'].dtype.tz else self.meteo_df['date'].dt.tz_localize('UTC')
 
         fecha_inicio_dt = pd.to_datetime(self.inicio).tz_localize("UTC")
         pasos = int((60 / self.intervalo_minutos) * 24 * self.dias)
@@ -190,43 +162,47 @@ class SyntheticDataGenerator:
 
         for ts in timestamps:
             esta_de_vacaciones = ts.date() in [d.date() for d in self._fechas_vacaciones]
+            hora = ts.hour + ts.minute / 60
+            mes = ts.month
 
             if esta_de_vacaciones:
-                consumo = 0.05  # Consumo mínimo during vacations
+                consumo = 0.05
             else:
-                hora = ts.hour + ts.minute / 60
                 dia_semana = ts.weekday()
-                mes = ts.month
-
-                # Find the closest meteorological data point
-                # Using merge_asof for efficient closest match
                 temp_df = pd.DataFrame({'timestamp': [ts]})
                 meteo_row_df = pd.merge_asof(temp_df, self.meteo_df, on='timestamp', direction='nearest')
-
                 if meteo_row_df.empty or meteo_row_df.iloc[0]['timestamp'] != ts:
-                    # Fallback or skip if no exact or nearest match is found
-                    # For this implementation, we'll skip if no exact match
-                    # print(f"Warning: No exact meteorological data found for timestamp {ts}. Skipping.")
-                    continue # Skip this timestamp if no meteo data
+                    continue
 
                 meteo = meteo_row_df.iloc[0]
-
-                # Calculate base consumption
                 consumo_base = self._get_base_consumption(hora, dia_semana)
-
-                # Adjust consumption with weather data
                 consumo_ajustado = self._adjust_consumption_with_weather(consumo_base, ts, meteo)
-
-                # Apply monthly multiplier
                 consumo_final = consumo_ajustado * self._multiplicador_mes.get(mes, 1.0)
-
-                # Apply efficiency multiplier
                 consumo = consumo_final * self._multiplicador_eficiencia.get(self._eficiencia, 1.0)
-
-                # Add some random noise for variability
                 consumo += np.random.normal(0, consumo * 0.05)
-                consumo = max(0, consumo) # Ensure consumption is not negative
+                consumo = max(0, consumo)
 
-            consumo_data.append({'timestamp': ts, 'consumo': consumo})
+            meteo_dict = meteo.to_dict()
 
-        return pd.DataFrame(consumo_data)
+            consumo_data.append({
+                'timestamp': ts,
+                'dayweek': ts.day,
+                'month': ts.month,
+                'hour': ts.hour,
+                'year': ts.year,
+                'consumo_kwh': round(consumo, 3),
+                'tipo_hogar': self.tipo_hogar,
+                'num_personas': self._num_personas,
+                'eficiencia_energetica': self._eficiencia,
+                'generacion_kwh': self._calculate_generation(ts, hora, mes, meteo) if not esta_de_vacaciones else 0.0,
+                'num_paneles': self.num_paneles,
+                'potencia_panel_w': self.potencia_panel_w,
+                'potencia_total_kw': round(self.potencia_total_kw, 2),
+                **meteo_dict
+            })
+    
+        df_consumo = pd.DataFrame(consumo_data)
+
+        df_consumo['timestamp'] = pd.to_datetime(df_consumo['timestamp'], errors='coerce', utc=True)
+
+        return df_consumo

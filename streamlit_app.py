@@ -25,8 +25,8 @@ if st.sidebar.button("Ejecutar Simulación"):
     weather_data_manager = WeatherDataManager()
 
     weather_df = weather_data_manager.obtener_datos_clima(
-        latitud=latitud,  # Latitud de Valencia
-        longitud=longitud,  # Longitud de Valencia
+        latitud=latitud,
+        longitud=longitud,
         fecha_inicio=datetime.now() - timedelta(hours=num_historical_hours),
         fecha_fin=datetime.now(),
     )
@@ -35,7 +35,7 @@ if st.sidebar.button("Ejecutar Simulación"):
     synthetic_data_generator = SyntheticDataGenerator(
         tipo_hogar=tipo_hogar,
         num_paneles=num_solar_panels,
-        inicio=datetime.now() - timedelta(hours=num_historical_hours),
+        inicio=(datetime.now() - timedelta(hours=num_historical_hours)).strftime('%Y-%m-%d'),
         dias=num_historical_hours // 24,
         meteo_df=weather_df,
         potencia_panel_w=potencia_panel_w,
@@ -46,10 +46,12 @@ if st.sidebar.button("Ejecutar Simulación"):
 
     st.info(f"Obteniendo precios de electricidad de la API para las próximas {num_future_hours} horas...")
     price_fetcher = RedElectricaDataManager()
-    # Intentar obtener precios desde la hora actual hasta future_hours en el futuro
-    start_date_api = datetime.now().strftime('%Y-%m-%d')
-    end_date_api = (datetime.now() + timedelta(hours=num_future_hours)).strftime('%Y-%m-%d')
-    future_price_data = price_fetcher.obtener_precios_periodo(start_date_api, end_date_api)
+
+    future_price_data = price_fetcher.cargar_datos_completos(
+        fecha_inicio=(datetime.now() - timedelta(hours=num_historical_hours)).strftime('%Y-%m-%d'), # Formatear a string
+        fecha_fin=datetime.now().strftime('%Y-%m-%d'), # Formatear a string
+        delta_dias=1
+    )
 
     if future_price_data.empty:
         st.warning("No se pudieron obtener precios de la API. Se usarán precios sintéticos o históricos si están disponibles.")
@@ -58,9 +60,6 @@ if st.sidebar.button("Ejecutar Simulación"):
 
     # 3. Inicializar y cargar datos en el optimizador
     optimizer = EnergyOptimizer()
-    # Pasamos los datos históricos sintéticos y, opcionalmente, los precios de la API para el futuro
-    # El método load_and_preprocess_data dividirá historical_data en entrenamiento y futuro
-    # e integrará future_price_data en la parte futura de historical_data si se proporciona.
     optimizer.load_and_preprocess_data(historical_data, future_hours=num_future_hours, price_dataframe=future_price_data)
 
     # Verificar si hay datos para continuar
@@ -68,10 +67,6 @@ if st.sidebar.button("Ejecutar Simulación"):
         # 4. Entrenar modelos
         optimizer.train_models()
 
-        # 5. Evaluar modelos (opcional)
-        # optimizer.evaluate_models()
-
-        # 6. Realizar predicciones futuras
         optimizer.predict_future()
 
         # 7. Ejecutar optimización
