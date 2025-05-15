@@ -1,1 +1,9 @@
 streamlit
+pandas
+numpy
+requests
+scikit-learn
+pulp
+openmeteo-requests
+requests-cache
+retry-requests
