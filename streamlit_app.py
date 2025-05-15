@@ -28,7 +28,7 @@ if st.sidebar.button("Ejecutar Simulación"):
         latitud=latitud,  # Latitud de Valencia
         longitud=longitud,  # Longitud de Valencia
         fecha_inicio=datetime.now() - timedelta(hours=num_historical_hours),
-        fecha_fin=datetime.now() + timedelta(hours=num_future_hours),
+        fecha_fin=datetime.now(),
     )
 
     # 1. Generar datos históricos sintéticos
@@ -42,7 +42,7 @@ if st.sidebar.button("Ejecutar Simulación"):
     )
 
     st.info(f"Generando datos históricos sintéticos para {num_historical_hours} horas...")
-    historical_data = synthetic_data_generator.generate_synthetic_data(num_hours=num_historical_hours, num_solar_panels=num_solar_panels)
+    historical_data = synthetic_data_generator.generate_consumption()
 
     st.info(f"Obteniendo precios de electricidad de la API para las próximas {num_future_hours} horas...")
     price_fetcher = RedElectricaDataManager()
