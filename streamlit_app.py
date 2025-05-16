@@ -20,15 +20,13 @@ num_historical_hours = st.sidebar.number_input("Horas de Datos Históricos Sint�
 num_future_hours = st.sidebar.number_input("Horas a Predecir y Optimizar", min_value=24, value=48, step=12) # Ej: 2 días
 
 if st.sidebar.button("Ejecutar Simulación"):
-    st.header("Resultados de la Simulación")
-
     weather_data_manager = WeatherDataManager()
 
     weather_df = weather_data_manager.obtener_datos_clima(
         latitud=latitud,
         longitud=longitud,
         fecha_inicio=datetime.now() - timedelta(hours=num_historical_hours),
-        fecha_fin=datetime.now(),
+        fecha_fin=datetime.now() - timedelta(1)
     )
 
     # 1. Generar datos históricos sintéticos

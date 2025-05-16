@@ -53,6 +53,7 @@ class RedElectricaDataManager:
         print(df_completo.head())
         # Procesamiento del dataframe
         df_completo['datetime'] = pd.to_datetime(df_completo['datetime'], errors='coerce', utc=True)
+        df_completo['value'] = df_completo['value'] / 1000  # Convertir de Wh a kWh
         
         # Convertir valor a céntimos de euro y redondear
         df_completo['valor_centimos'] = df_completo['value'] * 100
